@@ -6,3 +6,5 @@ build/
 my_build/
 .idea/
 .vscode/
+
+deps/

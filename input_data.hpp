@@ -59,7 +59,7 @@ struct InputData{
 
     void saveCameras(const std::string &filename, bool keepCrs);
 };
-// The colmapImageSourcePath is only used in Colmap. In other methods, this path is ignored.
-InputData inputDataFromX(const std::string& projectRoot, const std::string& colmapImageSourcePath = "");
+// colmapImageSourcePath is for COLMAP projects, opensfmImageSourcePath is for OpenSfM projects
+InputData inputDataFromX(const std::string& projectRoot, const std::string& colmapImageSourcePath = "", const std::string& opensfmImageSourcePath = "");
 
 #endif

@@ -50,7 +50,7 @@ void from_json(const json& j, Reconstruction &r){
     
 }
 
-InputData inputDataFromOpenSfM(const std::string &projectRoot){
+InputData inputDataFromOpenSfM(const std::string &projectRoot, const std::string& imageSourcePath){
     InputData ret;
     fs::path nsRoot(projectRoot);
     fs::path reconstructionPath = nsRoot / "reconstruction.json";
@@ -68,8 +68,14 @@ InputData inputDataFromOpenSfM(const std::string &projectRoot){
     std::string line;
     while(std::getline(f, line)){
         fs::path p(line);
-        if (p.is_absolute()) images[p.filename().string()] = line;
-        else images[p.filename().string()] = fs::absolute(nsRoot / p).string();
+        if (!imageSourcePath.empty()) {
+            // Use custom image source path, keep only the filename
+            images[p.filename().string()] = (fs::path(imageSourcePath) / p.filename()).string();
+        } else if (p.is_absolute()) {
+            images[p.filename().string()] = line;
+        } else {
+            images[p.filename().string()] = fs::absolute(nsRoot / p).string();
+        }
     }
     f.close();
     auto reconstructions = data.template get<std::vector<Reconstruction>>();

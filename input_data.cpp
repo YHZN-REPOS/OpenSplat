@@ -9,20 +9,27 @@ using json = nlohmann::json;
 
 namespace ns{ InputData inputDataFromNerfStudio(const std::string &projectRoot); }
 namespace cm{ InputData inputDataFromColmap(const std::string &projectRoot, const std::string& imageSourcePath); }
-namespace osfm { InputData inputDataFromOpenSfM(const std::string &projectRoot); }
+namespace osfm { InputData inputDataFromOpenSfM(const std::string &projectRoot, const std::string& imageSourcePath = ""); }
 namespace omvg { InputData inputDataFromOpenMVG(const std::string &projectRoot); }
 
-InputData inputDataFromX(const std::string &projectRoot, const std::string& colmapImageSourcePath){
+// Helper function to check if a directory exists and is not empty
+bool isNonEmptyDirectory(const fs::path& path) {
+    if (!fs::exists(path) || !fs::is_directory(path)) return false;
+    return !fs::is_empty(path);
+}
+
+InputData inputDataFromX(const std::string &projectRoot, const std::string& colmapImageSourcePath, const std::string& opensfmImageSourcePath){
     fs::path root(projectRoot);
 
     if (fs::exists(root / "transforms.json")){
         return ns::inputDataFromNerfStudio(projectRoot);
-    }else if (fs::exists(root / "sparse") || fs::exists(root / "cameras.bin")){
+    }else if (isNonEmptyDirectory(root / "sparse") || fs::exists(root / "cameras.bin")){
+        // Only use COLMAP if sparse directory is non-empty or cameras.bin exists
         return cm::inputDataFromColmap(projectRoot, colmapImageSourcePath);
     }else if (fs::exists(root / "reconstruction.json")){
-        return osfm::inputDataFromOpenSfM(projectRoot);
+        return osfm::inputDataFromOpenSfM(projectRoot, opensfmImageSourcePath);
     }else if (fs::exists(root / "opensfm" / "reconstruction.json")){
-        return osfm::inputDataFromOpenSfM((root / "opensfm").string());
+        return osfm::inputDataFromOpenSfM((root / "opensfm").string(), opensfmImageSourcePath);
     }else if (fs::exists(root / "sfm_data.json")){
         return omvg::inputDataFromOpenMVG((root).string());
     }

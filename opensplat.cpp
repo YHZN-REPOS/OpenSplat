@@ -42,6 +42,7 @@ int main(int argc, char *argv[]){
         ("stop-screen-size-at", "Stop splitting gaussians that are larger than [split-screen-size] after these many steps", cxxopts::value<int>()->default_value("4000"))
         ("split-screen-size", "Split gaussians that are larger than this percentage of screen space", cxxopts::value<float>()->default_value("0.05"))
         ("colmap-image-path", "Override the default image path for COLMAP-based input", cxxopts::value<std::string>()->default_value(""))
+        ("opensfm-image-path", "Override the default image path for OpenSfM-based input", cxxopts::value<std::string>()->default_value(""))
 #ifdef USE_VISUALIZATION
         ("has-visualization", "Show the visualization steps of training", cxxopts::value<bool>()->default_value("0"))
 #endif
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]){
     const int stopScreenSizeAt = result["stop-screen-size-at"].as<int>();
     const float splitScreenSize = result["split-screen-size"].as<float>();
     const std::string colmapImageSourcePath = result["colmap-image-path"].as<std::string>();
+    const std::string opensfmImageSourcePath = result["opensfm-image-path"].as<std::string>();
 #ifdef USE_VISUALIZATION
     const bool hasVisualization = result["has-visualization"].as<bool>();
 #endif
@@ -119,7 +121,7 @@ int main(int argc, char *argv[]){
 #endif
 
     try{
-        InputData inputData = inputDataFromX(projectRoot, colmapImageSourcePath);
+        InputData inputData = inputDataFromX(projectRoot, colmapImageSourcePath, opensfmImageSourcePath);
 
         parallel_for(inputData.cameras.begin(), inputData.cameras.end(), [&downScaleFactor](Camera &cam){
             cam.loadImage(downScaleFactor);

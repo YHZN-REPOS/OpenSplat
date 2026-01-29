@@ -1,0 +1,94 @@
+# =============================================================================
+# OpenSplat 国内优化版 Dockerfile
+# 针对 RTX 4060 Ti (Ada Lovelace, SM 8.9) 配置
+# =============================================================================
+# 
+# 使用前请先下载依赖文件并放入项目根目录的 deps 文件夹：
+#
+# mkdir -p deps && cd deps
+# wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.2.1%2Bcu121.zip -O libtorch.zip
+# wget https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip -O nlohmann_json.zip
+# wget https://github.com/jlblancoc/nanoflann/archive/refs/tags/v1.5.5.zip -O nanoflann.zip
+# wget https://github.com/jarro2783/cxxopts/archive/refs/tags/v3.2.0.zip -O cxxopts.zip
+# wget https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip -O glm.zip
+#
+# 构建命令：
+# docker build -f Dockerfile.cn -t opensplat:rtx4060ti .
+#
+# 运行命令：
+# docker run -it --gpus all -v ~/data:/data opensplat:rtx4060ti bash
+# =============================================================================
+
+# 使用 NVIDIA 官方 CUDA 镜像，省去单独安装 CUDA 的步骤
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+
+# RTX 4060 Ti = Ada Lovelace 架构 = SM 8.9
+ARG CMAKE_CUDA_ARCHITECTURES=89
+ARG CMAKE_BUILD_TYPE=Release
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /code
+
+# ========== 1. 替换 apt 源为阿里云镜像 ==========
+RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
+    sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+
+# ========== 2. 安装构建依赖 ==========
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    ninja-build \
+    libopencv-dev \
+    unzip \
+    wget && \
+    apt-get autoremove -y --purge && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# ========== 3. 复制预下载的依赖文件 ==========
+COPY deps/ /code/deps/
+
+# ========== 4. 解压 libtorch ==========
+RUN unzip -q /code/deps/libtorch.zip -d /code && rm /code/deps/libtorch.zip
+
+# ========== 5. 复制源代码 ==========
+COPY . ./
+
+# ========== 6. 解压 CMake 依赖到指定目录 ==========
+RUN mkdir -p /code/deps_src && \
+    unzip -q /code/deps/nlohmann_json.zip -d /code/deps_src && \
+    mv /code/deps_src/json-* /code/deps_src/nlohmann_json && \
+    unzip -q /code/deps/nanoflann.zip -d /code/deps_src && \
+    mv /code/deps_src/nanoflann-* /code/deps_src/nanoflann && \
+    unzip -q /code/deps/cxxopts.zip -d /code/deps_src && \
+    mv /code/deps_src/cxxopts-* /code/deps_src/cxxopts && \
+    unzip -q /code/deps/glm.zip -d /code/deps_src && \
+    mv /code/deps_src/glm-* /code/deps_src/glm && \
+    rm -rf /code/deps
+
+# ========== 7. 编译 OpenSplat (使用本地依赖) ==========
+RUN mkdir build && cd build && \
+    cmake .. \
+    -GNinja \
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+    -DCMAKE_PREFIX_PATH=/code/libtorch \
+    -DCMAKE_INSTALL_PREFIX=/code/install \
+    -DCMAKE_CUDA_ARCHITECTURES="${CMAKE_CUDA_ARCHITECTURES}" \
+    -DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=/code/deps_src/nlohmann_json \
+    -DFETCHCONTENT_SOURCE_DIR_NANOFLANN=/code/deps_src/nanoflann \
+    -DFETCHCONTENT_SOURCE_DIR_CXXOPTS=/code/deps_src/cxxopts \
+    -DFETCHCONTENT_SOURCE_DIR_GLM=/code/deps_src/glm && \
+    ninja
+
+# ========== 8. 安装为系统命令 ==========
+RUN ln -s /code/build/opensplat /usr/local/bin/opensplat
+
+# 设置默认工作目录为数据目录
+WORKDIR /data
+
+# 默认命令
+CMD ["opensplat", "--help"]

@@ -48,7 +48,7 @@ namespace osfm{
     };
     void from_json(const json& j, Reconstruction &r);
 
-    InputData inputDataFromOpenSfM(const std::string &projectRoot);
+    InputData inputDataFromOpenSfM(const std::string &projectRoot, const std::string& imageSourcePath = "");
 }   
 
 #endif

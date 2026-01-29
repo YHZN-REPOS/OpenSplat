@@ -4,66 +4,58 @@
 
 ## 1. 如何在国内构建镜像
 
-为了解决国内网络访问瓶颈，建议使用 `Dockerfile.cn` 进行构建。该构建通过阿里云镜像源并支持本地依赖缓存。
+为了方便国内用户，我们提供了一键式构建脚本 `build_docker.sh`。
 
-### 准备工作
-在项目根目录创建 `deps` 文件夹，并下载以下依赖文件放入其中：
+### 步骤一：准备依赖
+脚本支持自动下载构建所需的 libtorch 及其他 C++ 依赖库：
 
 ```bash
-mkdir -p deps && cd deps
-# libtorch (CUDA 12.1 版本)
-wget https://download.pytorch.org/libtorch/cu121/libtorch-cxx11-abi-shared-with-deps-2.2.1%2Bcu121.zip -O libtorch.zip
-# 其他 C++ 依赖
-wget https://github.com/nlohmann/json/archive/refs/tags/v3.11.3.zip -O nlohmann_json.zip
-wget https://github.com/jlblancoc/nanoflann/archive/refs/tags/v1.5.5.zip -O nanoflann.zip
-wget https://github.com/jarro2783/cxxopts/archive/refs/tags/v3.2.0.zip -O cxxopts.zip
-wget https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip -O glm.zip
+# 下载所有依赖文件到 deps 目录
+./build_docker.sh --download-deps
 ```
 
-### 构建命令
-针对 RTX 4060 Ti (Ada Lovelace 架构) 的优化构建命令：
+### 步骤二：一键构建
+依赖准备完成后，直接运行脚本即可完成镜像构建（默认标签为 `opensplat-dev:latest`）：
 
 ```bash
-docker build -f Dockerfile.cn -t opensplat:rtx4060ti .
+# 执行一键构建
+./build_docker.sh
+```
+> 注：该构建基于 `Dockerfile.cn`，已针对 RTX 4060 Ti (Ada Lovelace 架构) 进行优化，并使用了阿里云镜像源。
+
+---
+
+## 2. 容器使用说明
+
+### 默认工作目录
+镜像启动后的默认工作目录为 `/data`。建议将宿主机的项目数据挂载到此目录下。
+
+### 系统级命令支持
+在新的镜像中，`opensplat` 已配置为系统级命令。您可以在任何路径下直接输入 `opensplat` 运行，无需再前往 `/code/build/` 目录寻找可执行文件。
+
+### 启动示例
+```bash
+# 启动容器并挂载数据
+docker run -it --gpus all -v ~/data:/data opensplat-dev:latest bash
 ```
 
 ---
 
-## 2. 新增参数说明：`--opensfm-image-path`
+## 3. 新增参数说明：`--opensfm-image-path`
 
 ### 作用
 该参数用于在使用 OpenSfM 项目作为输入时，**覆盖默认的图像搜索路径**。
 
 ### 适用场景
-在 OpenSfM 项目中，`reconstruction.json` 或 `image_list.txt` 中记录的图像路径可能是绝对路径或相对于原始项目的路径。如果您在重建完成后移动了图像文件夹，或者在 Docker 容器中挂载的路径与原始记录不符，可以使用此参数指定图像的实际存放位置。
+在 OpenSfM 项目中，`reconstruction.json` 记录的路径可能不符合当前的目录结构。您可以使用此参数指定图像的实际存放位置，程序会自动保持文件名不变，仅替换路径部分。
 
-程序会自动保持原始文件名，仅将目录部分替换为您指定的路径。
+### 运行示例
+```bash
+# 在容器内直接执行（已支持系统命令）
+opensplat /data/your_project --opensfm-image-path /data/actual_images -n 2000
+```
 
 ---
 
-## 3. 镜像使用说明
-
-### 启动容器
-使用以下命令启动并挂载数据目录（假设您的数据在宿主机的 `~/data`）：
-
-```bash
-docker run -it --gpus all -v ~/data:/data opensplat:rtx4060ti bash
-```
-
-### 执行训练
-进入容器后，可以使用以下方式运行程序：
-
-#### 基本使用
-```bash
-opensplat /data/your_project_folder -n 2000
-```
-
-#### 使用 OpenSfM 路径覆盖
-如果您的图像放在 `/data/my_images`，而项目文件在 `/data/project`：
-
-```bash
-opensplat /data/project --opensfm-image-path /data/my_images -n 2000
-```
-
-### 生成结果
-程序运行完成后，会在项目目录下生成 `splat.ply`（模型文件）和 `cameras.json`（相机参数），您可以将其拖入网页版查看器（如 PlayCanvas Viewer）进行预览。
+## 4. 结果查看
+训练完成后，模型文件 `splat.ply` 和相机参数 `cameras.json` 将保存在您的项目目录下。您可以使用 PlayCanvas Viewer 等查看器进行预览。
